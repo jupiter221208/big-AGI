@@ -17,6 +17,7 @@
     /* Bundled projects */
     "lib": ["dom", "dom.iterable", "ESNext"],
     "noEmit": true,
+    "noEmitOnError": false,
     "module": "ESNext",
     "moduleResolution": "Bundler",
     "jsx": "preserve",
