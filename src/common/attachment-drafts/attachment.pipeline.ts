@@ -10,14 +10,43 @@ import { htmlTableToMarkdown } from '~/common/util/htmlTableToMarkdown';
 import { humanReadableHyphenated } from '~/common/util/textUtils';
 import { pdfToImageDataURLs, pdfToText } from '~/common/util/pdfUtils';
 
-import { createDMessageDataInlineText, createDocAttachmentFragment, DMessageAttachmentFragment, DMessageDataInline, DMessageDocPart, DVMimeType, isContentOrAttachmentFragment, isDocPart, specialContentPartToDocAttachmentFragment } from '~/common/stores/chat/chat.fragments';
+import {
+  createDMessageDataInlineText,
+  createDocAttachmentFragment,
+  DMessageAttachmentFragment,
+  DMessageDataInline,
+  DMessageDocPart,
+  DVMimeType,
+  isContentOrAttachmentFragment,
+  isDocPart,
+  specialContentPartToDocAttachmentFragment,
+} from '~/common/stores/chat/chat.fragments';
 
-import type { AttachmentCreationOptions, AttachmentDraft, AttachmentDraftConverter, AttachmentDraftId, AttachmentDraftInput, AttachmentDraftSource, AttachmentDraftSourceOriginFile, DraftEgoFragmentsInputData, DraftWebInputData, DraftYouTubeInputData } from './attachment.types';
+import type {
+  AttachmentCreationOptions,
+  AttachmentDraft,
+  AttachmentDraftConverter,
+  AttachmentDraftId,
+  AttachmentDraftInput,
+  AttachmentDraftSource,
+  AttachmentDraftSourceOriginFile,
+  DraftEgoFragmentsInputData,
+  DraftWebInputData,
+  DraftYouTubeInputData,
+} from './attachment.types';
 import type { AttachmentsDraftsStore } from './store-perchat-attachment-drafts_slice';
 import { attachmentGetLiveFileId, attachmentSourceSupportsLiveFile } from './attachment.livefile';
-import { guessInputContentTypeFromMime, heuristicMimeTypeFixup, mimeTypeIsDocX, mimeTypeIsPDF, mimeTypeIsPlainText, mimeTypeIsSupportedImage, reverseLookupMimeType } from './attachment.mimetypes';
+import {
+  guessInputContentTypeFromMime,
+  heuristicMimeTypeFixup,
+  mimeTypeIsDocX,
+  mimeTypeIsXlsX,
+  mimeTypeIsPDF,
+  mimeTypeIsPlainText,
+  mimeTypeIsSupportedImage,
+  reverseLookupMimeType,
+} from './attachment.mimetypes';
 import { imageDataToImageAttachmentFragmentViaDBlob } from './attachment.dblobs';
-
 
 // configuration
 export const DEFAULT_ADRAFT_IMAGE_MIMETYPE = !Is.Browser.Safari ? 'image/webp' : 'image/jpeg';
@@ -27,12 +56,10 @@ const PDF_IMAGE_QUALITY = 0.5;
 const ENABLE_TEXT_AND_IMAGES = false; // 2.0
 const DOCPART_DEFAULT_VERSION = 1;
 
-
 // internal mimes, only used to route data within us (source -> input -> converters)
 const INT_MIME_VND_AGI_EGO_FRAGMENTS = 'application/vnd.agi.ego.fragments';
 const INT_MIME_VND_AGI_WEBPAGE = 'application/vnd.agi.webpage';
 const INT_MIME_VND_AGI_YOUTUBE = 'application/vnd.agi.youtube';
-
 
 /**
  * Creates a new AttachmentDraft object.
@@ -60,11 +87,13 @@ export function attachmentCreate(source: AttachmentDraftSource): AttachmentDraft
  * @param {Readonly<AttachmentDraftSource>} source - The source of the attachment.
  * @param {(changes: Partial<AttachmentDraft>) => void} edit - A function to edit the AttachmentDraft object.
  */
-export async function attachmentLoadInputAsync(source: Readonly<AttachmentDraftSource>, edit: (changes: Partial<Omit<AttachmentDraft, 'outputFragments'>>) => void) {
+export async function attachmentLoadInputAsync(
+  source: Readonly<AttachmentDraftSource>,
+  edit: (changes: Partial<Omit<AttachmentDraft, 'outputFragments'>>) => void,
+) {
   edit({ inputLoading: true });
 
   switch (source.media) {
-
     // Download URL (page, file, ..) and attach as input
     case 'url':
       edit({ label: source.refUrl, ref: source.refUrl });
@@ -85,11 +114,13 @@ export async function attachmentLoadInputAsync(source: Readonly<AttachmentDraftS
                 videoThumbnailUrl: videoData.thumbnailUrl,
                 videoTranscript: videoData.transcript,
               },
-              urlImage: !videoData.thumbnailImage ? undefined : {
-                ...videoData.thumbnailImage,
-                generator: 'youtube-thumbnail',
-                timestamp: Date.now(),
-              },
+              urlImage: !videoData.thumbnailImage
+                ? undefined
+                : {
+                    ...videoData.thumbnailImage,
+                    generator: 'youtube-thumbnail',
+                    timestamp: Date.now(),
+                  },
             },
           });
           break;
@@ -98,9 +129,11 @@ export async function attachmentLoadInputAsync(source: Readonly<AttachmentDraftS
 
       try {
         // fetch the web page
-        const { title, content: { html, markdown, text }, screenshot } = await callBrowseFetchPage(
-          source.url, ['text', 'markdown', 'html'], { width: 512, height: 512, quality: 98 },
-        );
+        const {
+          title,
+          content: { html, markdown, text },
+          screenshot,
+        } = await callBrowseFetchPage(source.url, ['text', 'markdown', 'html'], { width: 512, height: 512, quality: 98 });
         if (html || markdown || text)
           edit({
             label: title || source.refUrl,
@@ -112,15 +145,16 @@ export async function attachmentLoadInputAsync(source: Readonly<AttachmentDraftS
                 pageCleanedHtml: html ?? undefined,
                 pageTitle: title || undefined,
               },
-              urlImage: !screenshot ? undefined : {
-                ...screenshot,
-                generator: 'web-capture',
-                timestamp: Date.now(),
-              },
+              urlImage: !screenshot
+                ? undefined
+                : {
+                    ...screenshot,
+                    generator: 'web-capture',
+                    timestamp: Date.now(),
+                  },
             },
           });
-        else
-          edit({ inputError: 'No content found at this link' });
+        else edit({ inputError: 'No content found at this link' });
       } catch (error: any) {
         edit({ inputError: `Issue downloading page: ${error?.message || (typeof error === 'string' ? error : JSON.stringify(error))}` });
       }
@@ -135,8 +169,7 @@ export async function attachmentLoadInputAsync(source: Readonly<AttachmentDraftS
       const fileExtension = source.refPath.split('.').pop()?.toLowerCase() || undefined;
       if (!fileMime) {
         // see note on 'attachAppendDataTransfer'; this is a fallback for drag/drop missing Mimes sometimes
-        if (fileExtension)
-          fileMime = reverseLookupMimeType(fileExtension);
+        if (fileExtension) fileMime = reverseLookupMimeType(fileExtension);
 
         // unknown extension or missing extension and mime: falling back to text/plain
         if (!fileMime) {
@@ -163,9 +196,10 @@ export async function attachmentLoadInputAsync(source: Readonly<AttachmentDraftS
           },
         });
       } catch (error: any) {
-        const errorText = (error?.name === 'AbortError' && source.fileWithHandle.type === '')
-          ? 'unsupported file type or possible folder. For folders and LiveFile support, we recommend using Google Chrome.'
-          : `issue loading file: ${error?.message || (typeof error === 'string' ? error : JSON.stringify(error))}`;
+        const errorText =
+          error?.name === 'AbortError' && source.fileWithHandle.type === ''
+            ? 'unsupported file type or possible folder. For folders and LiveFile support, we recommend using Google Chrome.'
+            : `issue loading file: ${error?.message || (typeof error === 'string' ? error : JSON.stringify(error))}`;
         edit({ inputError: errorText });
       }
       break;
@@ -173,7 +207,10 @@ export async function attachmentLoadInputAsync(source: Readonly<AttachmentDraftS
     case 'text':
       // Obsidian URLs, for dragging: we won't be able to open them, so we'll show the input error instead
       if (source.textPlain?.startsWith('obsidian://open?vault=')) {
-        edit({ label: 'Obsidian Issue', inputError: 'Drag and drop does not work with Obsidian URLs. Please open/attach the file, or drag it from finder/explorer, or paste the content.' });
+        edit({
+          label: 'Obsidian Issue',
+          inputError: 'Drag and drop does not work with Obsidian URLs. Please open/attach the file, or drag it from finder/explorer, or paste the content.',
+        });
         break;
       }
 
@@ -218,7 +255,6 @@ export async function attachmentLoadInputAsync(source: Readonly<AttachmentDraftS
   edit({ inputLoading: false });
 }
 
-
 /**
  * Defines the possible converters for an AttachmentDraft object based on its input type.
  *
@@ -227,15 +263,18 @@ export async function attachmentLoadInputAsync(source: Readonly<AttachmentDraftS
  * @param options conversion preferences, if any
  * @param {(changes: Partial<AttachmentDraft>) => void} edit - A function to edit the AttachmentDraft object.
  */
-export function attachmentDefineConverters(source: AttachmentDraftSource, input: Readonly<AttachmentDraftInput>, options: AttachmentCreationOptions, edit: (changes: Partial<Omit<AttachmentDraft, 'outputFragments'>>) => void) {
-
+export function attachmentDefineConverters(
+  source: AttachmentDraftSource,
+  input: Readonly<AttachmentDraftInput>,
+  options: AttachmentCreationOptions,
+  edit: (changes: Partial<Omit<AttachmentDraft, 'outputFragments'>>) => void,
+) {
   // return all the possible converters for the input
   const converters: AttachmentDraftConverter[] = [];
 
   const autoAddImages = ENABLE_TEXT_AND_IMAGES && !!options?.hintAddImages;
 
   switch (true) {
-
     // plain text types
     case mimeTypeIsPlainText(input.mimeType):
       // handle a secondary layer of HTML 'text' origins: drop, paste, and clipboard-read
@@ -243,8 +282,7 @@ export function attachmentDefineConverters(source: AttachmentDraftSource, input:
       const isHtmlTable = !!input.altData?.startsWith('<table');
 
       // p1: Tables
-      if (textOriginHtml && isHtmlTable)
-        converters.push({ id: 'rich-text-table', name: 'Markdown Table' });
+      if (textOriginHtml && isHtmlTable) converters.push({ id: 'rich-text-table', name: 'Markdown Table' });
 
       // p2: Text
       converters.push({ id: 'text', name: attachmentSourceSupportsLiveFile(source) ? 'Text (Live)' : 'Text' });
@@ -262,8 +300,7 @@ export function attachmentDefineConverters(source: AttachmentDraftSource, input:
       converters.push({ id: 'image-resized-high', name: 'Image (high detail)', disabled: !inputImageMimeSupported });
       converters.push({ id: 'image-resized-low', name: 'Image (low detail)', disabled: !inputImageMimeSupported });
       converters.push({ id: 'image-original', name: 'Image (original quality)', disabled: !inputImageMimeSupported });
-      if (!inputImageMimeSupported)
-        converters.push({ id: 'image-to-default', name: `As Image (${DEFAULT_ADRAFT_IMAGE_MIMETYPE})` });
+      if (!inputImageMimeSupported) converters.push({ id: 'image-to-default', name: `As Image (${DEFAULT_ADRAFT_IMAGE_MIMETYPE})` });
       converters.push({ id: 'image-ocr', name: 'As Text (OCR)' });
       break;
 
@@ -279,20 +316,27 @@ export function attachmentDefineConverters(source: AttachmentDraftSource, input:
       converters.push({ id: 'docx-to-html', name: 'DOCX to HTML' });
       break;
 
+    // XLSX
+    case mimeTypeIsXlsX(input.mimeType):
+      converters.push({ id: 'xlsx-to-html', name: 'Xlsx to HTML' });
+      break;
+
     // URL: custom converters because of a custom input structure with multiple inputs
     case input.mimeType === INT_MIME_VND_AGI_WEBPAGE:
       const pageData = input.data as DraftWebInputData;
       const preferMarkdown = !!pageData.pageMarkdown;
-      if (pageData.pageText)
-        converters.push({ id: 'url-page-text', name: 'Text', isActive: !preferMarkdown });
-      if (pageData.pageMarkdown)
-        converters.push({ id: 'url-page-markdown', name: 'Markdown (suggested)', isActive: preferMarkdown });
-      if (pageData.pageCleanedHtml)
-        converters.push({ id: 'url-page-html', name: 'Clean HTML', isActive: !preferMarkdown && !pageData.pageText });
+      if (pageData.pageText) converters.push({ id: 'url-page-text', name: 'Text', isActive: !preferMarkdown });
+      if (pageData.pageMarkdown) converters.push({ id: 'url-page-markdown', name: 'Markdown (suggested)', isActive: preferMarkdown });
+      if (pageData.pageCleanedHtml) converters.push({ id: 'url-page-html', name: 'Clean HTML', isActive: !preferMarkdown && !pageData.pageText });
       if (input.urlImage) {
-        if (converters.length)
-          converters.push({ id: 'url-page-null', name: 'Do not attach' });
-        converters.push({ id: 'url-page-image', name: 'Add Screenshot', disabled: !input.urlImage.width || !input.urlImage.height, isCheckbox: true, isActive: autoAddImages || undefined });
+        if (converters.length) converters.push({ id: 'url-page-null', name: 'Do not attach' });
+        converters.push({
+          id: 'url-page-image',
+          name: 'Add Screenshot',
+          disabled: !input.urlImage.width || !input.urlImage.height,
+          isCheckbox: true,
+          isActive: autoAddImages || undefined,
+        });
       }
       break;
 
@@ -301,7 +345,13 @@ export function attachmentDefineConverters(source: AttachmentDraftSource, input:
       converters.push({ id: 'youtube-transcript', name: 'Video Transcript', isActive: true });
       converters.push({ id: 'youtube-transcript-simple', name: 'Video Transcript (simple)' });
       if (input.urlImage)
-        converters.push({ id: 'url-page-image', name: 'Add Thumbnail', disabled: !input.urlImage.width || !input.urlImage.height, isCheckbox: true, isActive: autoAddImages });
+        converters.push({
+          id: 'url-page-image',
+          name: 'Add Thumbnail',
+          disabled: !input.urlImage.width || !input.urlImage.height,
+          isCheckbox: true,
+          isActive: autoAddImages,
+        });
       break;
 
     // EGO
@@ -319,12 +369,15 @@ export function attachmentDefineConverters(source: AttachmentDraftSource, input:
   edit({ converters });
 }
 
-
 function _lowCollisionRefString(prefix: string, digits: number): string {
   return `${prefix} ${agiCustomId(digits)}`;
 }
 
-function _prepareDocData(source: AttachmentDraftSource, input: Readonly<AttachmentDraftInput>, converterName: string): {
+function _prepareDocData(
+  source: AttachmentDraftSource,
+  input: Readonly<AttachmentDraftInput>,
+  converterName: string,
+): {
   title: string;
   caption: string;
   refString: string;
@@ -332,15 +385,15 @@ function _prepareDocData(source: AttachmentDraftSource, input: Readonly<Attachme
 } {
   const inputMime = input.mimeType || '';
   switch (source.media) {
-
     // Downloaded URL as Text, Markdown, or HTML
     case 'url':
       let pageTitle =
-        inputMime === INT_MIME_VND_AGI_WEBPAGE ? (input.data as DraftWebInputData)?.pageTitle
-          : inputMime === INT_MIME_VND_AGI_YOUTUBE ? (input.data as DraftYouTubeInputData)?.videoTitle
+        inputMime === INT_MIME_VND_AGI_WEBPAGE
+          ? (input.data as DraftWebInputData)?.pageTitle
+          : inputMime === INT_MIME_VND_AGI_YOUTUBE
+            ? (input.data as DraftYouTubeInputData)?.videoTitle
             : undefined;
-      if (!pageTitle)
-        pageTitle = `Web page: ${source.refUrl}`;
+      if (!pageTitle) pageTitle = `Web page: ${source.refUrl}`;
       const urlRefString = inputMime === INT_MIME_VND_AGI_YOUTUBE ? 'youtube-' + (input.data as DraftYouTubeInputData)?.videoId : pageTitle;
       return {
         title: pageTitle,
@@ -406,8 +459,7 @@ function _prepareDocData(source: AttachmentDraftSource, input: Readonly<Attachme
 }
 
 function _guessDocVDT(inputMimeType: string): DMessageDocPart['vdt'] {
-  if (!inputMimeType)
-    return DVMimeType.TextPlain;
+  if (!inputMimeType) return DVMimeType.TextPlain;
   const inputContentType = guessInputContentTypeFromMime(inputMimeType);
   switch (inputContentType) {
     case 'plain':
@@ -431,7 +483,6 @@ function _guessDocVDT(inputMimeType: string): DMessageDocPart['vdt'] {
   return DVMimeType.TextPlain;
 }
 
-
 /**
  * Converts the input of an AttachmentDraft object based on the selected converter.
  *
@@ -441,18 +492,19 @@ function _guessDocVDT(inputMimeType: string): DMessageDocPart['vdt'] {
  */
 export async function attachmentPerformConversion(
   attachment: Readonly<AttachmentDraft>,
-  edit: (attachmentDraftId: AttachmentDraftId, update: Partial<Omit<AttachmentDraft, 'outputFragments'>>) => void, /* AttachmentsDraftsStore['_editAttachment'] */
+  edit: (
+    attachmentDraftId: AttachmentDraftId,
+    update: Partial<Omit<AttachmentDraft, 'outputFragments'>>,
+  ) => void /* AttachmentsDraftsStore['_editAttachment'] */,
   replaceOutputFragments: AttachmentsDraftsStore['_replaceAttachmentOutputFragments'],
 ) {
-
   // clear outputs
   // NOTE: disabled, to keep the old conversions while converting to the new - keeps the UI less 'flashing'
   // replaceOutputFragments(attachment.id, []);
 
   // get converter
   const { input, source } = attachment;
-  if (!input)
-    return;
+  if (!input) return;
 
   edit(attachment.id, {
     outputsConverting: true,
@@ -468,12 +520,22 @@ export async function attachmentPerformConversion(
     let { title, caption, refString, docMeta } = _prepareDocData(source, input, converter.name);
 
     switch (converter.id) {
-
       // text as-is
       case 'text':
         const possibleLiveFileId = await attachmentGetLiveFileId(source);
         const textualInlineData = createDMessageDataInlineText(_inputDataToString(input.data), input.mimeType);
-        newFragments.push(createDocAttachmentFragment(title, caption, _guessDocVDT(input.mimeType), textualInlineData, refString, DOCPART_DEFAULT_VERSION, docMeta, possibleLiveFileId));
+        newFragments.push(
+          createDocAttachmentFragment(
+            title,
+            caption,
+            _guessDocVDT(input.mimeType),
+            textualInlineData,
+            refString,
+            DOCPART_DEFAULT_VERSION,
+            docMeta,
+            possibleLiveFileId,
+          ),
+        );
         break;
 
       // html as-is
@@ -488,9 +550,7 @@ export async function attachmentPerformConversion(
       case 'rich-text-cleaner':
         const cleanerHtml = (input.altData || '')
           // remove class and style attributes
-          .replace(/<[^>]+>/g, (tag) =>
-            tag.replace(/ class="[^"]*"/g, '').replace(/ style="[^"]*"/g, ''),
-          )
+          .replace(/<[^>]+>/g, (tag) => tag.replace(/ class="[^"]*"/g, '').replace(/ style="[^"]*"/g, ''))
           // remove svg elements
           .replace(/<svg[^>]*>.*?<\/svg>/g, '');
         const cleanedHtmlData = createDMessageDataInlineText(cleanerHtml, 'text/html');
@@ -507,9 +567,18 @@ export async function attachmentPerformConversion(
           // fallback to text/plain
           tableData = createDMessageDataInlineText(_inputDataToString(input.data), input.mimeType);
         }
-        newFragments.push(createDocAttachmentFragment(title, caption, tableData.mimeType === 'text/markdown' ? DVMimeType.TextPlain : DVMimeType.TextPlain, tableData, refString, DOCPART_DEFAULT_VERSION, docMeta));
+        newFragments.push(
+          createDocAttachmentFragment(
+            title,
+            caption,
+            tableData.mimeType === 'text/markdown' ? DVMimeType.TextPlain : DVMimeType.TextPlain,
+            tableData,
+            refString,
+            DOCPART_DEFAULT_VERSION,
+            docMeta,
+          ),
+        );
         break;
-
 
       // image resized (default mime/quality, openai-high-res)
       case 'image-resized-high':
@@ -518,8 +587,7 @@ export async function attachmentPerformConversion(
           return null;
         }
         const imageHighF = await imageDataToImageAttachmentFragmentViaDBlob(input.mimeType, input.data, source, title, caption, false, 'openai-high-res');
-        if (imageHighF)
-          newFragments.push(imageHighF);
+        if (imageHighF) newFragments.push(imageHighF);
         break;
 
       // image resized (default mime/quality, openai-low-res)
@@ -529,8 +597,7 @@ export async function attachmentPerformConversion(
           return null;
         }
         const imageLowF = await imageDataToImageAttachmentFragmentViaDBlob(input.mimeType, input.data, source, title, caption, false, 'openai-low-res');
-        if (imageLowF)
-          newFragments.push(imageLowF);
+        if (imageLowF) newFragments.push(imageLowF);
         break;
 
       // image as-is
@@ -540,8 +607,7 @@ export async function attachmentPerformConversion(
           return null;
         }
         const imageOrigF = await imageDataToImageAttachmentFragmentViaDBlob(input.mimeType, input.data, source, title, caption, false, false);
-        if (imageOrigF)
-          newFragments.push(imageOrigF);
+        if (imageOrigF) newFragments.push(imageOrigF);
         break;
 
       // image converted (potentially unsupported mime)
@@ -550,9 +616,16 @@ export async function attachmentPerformConversion(
           console.log('Expected ArrayBuffer for image-to-default, got:', typeof input.data);
           return null;
         }
-        const imageCastF = await imageDataToImageAttachmentFragmentViaDBlob(input.mimeType, input.data, source, title, caption, DEFAULT_ADRAFT_IMAGE_MIMETYPE, false);
-        if (imageCastF)
-          newFragments.push(imageCastF);
+        const imageCastF = await imageDataToImageAttachmentFragmentViaDBlob(
+          input.mimeType,
+          input.data,
+          source,
+          title,
+          caption,
+          DEFAULT_ADRAFT_IMAGE_MIMETYPE,
+          false,
+        );
+        if (imageCastF) newFragments.push(imageCastF);
         break;
 
       // image to text
@@ -566,7 +639,7 @@ export async function attachmentPerformConversion(
           const { recognize } = await import('tesseract.js');
           const buffer = Buffer.from(input.data);
           const result = await recognize(buffer, undefined, {
-            errorHandler: e => console.error(e),
+            errorHandler: (e) => console.error(e),
             logger: (message) => {
               if (message.status === 'recognizing text') {
                 if (message.progress > lastProgress + 0.01) {
@@ -577,12 +650,21 @@ export async function attachmentPerformConversion(
             },
           });
           const imageText = result.data.text;
-          newFragments.push(createDocAttachmentFragment(title, caption, DVMimeType.TextPlain, createDMessageDataInlineText(imageText, 'text/plain'), refString, DOCPART_DEFAULT_VERSION, { ...docMeta, srcOcrFrom: 'image' }));
+          newFragments.push(
+            createDocAttachmentFragment(
+              title,
+              caption,
+              DVMimeType.TextPlain,
+              createDMessageDataInlineText(imageText, 'text/plain'),
+              refString,
+              DOCPART_DEFAULT_VERSION,
+              { ...docMeta, srcOcrFrom: 'image' },
+            ),
+          );
         } catch (error) {
           console.error(error);
         }
         break;
-
 
       // pdf to text
       case 'pdf-text':
@@ -599,7 +681,17 @@ export async function attachmentPerformConversion(
           // Warn the user if no text is extracted
           // edit(attachment.id, { inputError: 'No text found in the PDF file.' });
         } else
-          newFragments.push(createDocAttachmentFragment(title, caption, DVMimeType.TextPlain, createDMessageDataInlineText(pdfText, 'text/plain'), refString, DOCPART_DEFAULT_VERSION, { ...docMeta, srcOcrFrom: 'pdf' }));
+          newFragments.push(
+            createDocAttachmentFragment(
+              title,
+              caption,
+              DVMimeType.TextPlain,
+              createDMessageDataInlineText(pdfText, 'text/plain'),
+              refString,
+              DOCPART_DEFAULT_VERSION,
+              { ...docMeta, srcOcrFrom: 'pdf' },
+            ),
+          );
         break;
 
       // pdf to images
@@ -615,9 +707,16 @@ export async function attachmentPerformConversion(
             edit(attachment.id, { outputsConversionProgress: progress });
           });
           for (const pdfPageImage of imageDataURLs) {
-            const pdfPageImageF = await imageDataToImageAttachmentFragmentViaDBlob(pdfPageImage.mimeType, pdfPageImage.base64Data, source, `${title} (pg. ${newFragments.length + 1})`, caption, false, false);
-            if (pdfPageImageF)
-              newFragments.push(pdfPageImageF);
+            const pdfPageImageF = await imageDataToImageAttachmentFragmentViaDBlob(
+              pdfPageImage.mimeType,
+              pdfPageImage.base64Data,
+              source,
+              `${title} (pg. ${newFragments.length + 1})`,
+              caption,
+              false,
+              false,
+            );
+            if (pdfPageImageF) newFragments.push(pdfPageImageF);
           }
         } catch (error) {
           console.error('Error converting PDF to images:', error);
@@ -633,13 +732,26 @@ export async function attachmentPerformConversion(
         try {
           // duplicated from 'pdf-images' (different progress update)
           const imageFragments: DMessageAttachmentFragment[] = [];
-          const imageDataURLs = await pdfToImageDataURLs(new Uint8Array(input.data.slice(0)).buffer, DEFAULT_ADRAFT_IMAGE_MIMETYPE, PDF_IMAGE_QUALITY, PDF_IMAGE_PAGE_SCALE, (progress) => {
-            edit(attachment.id, { outputsConversionProgress: progress / 2 }); // Update progress (0% to 50%)
-          });
+          const imageDataURLs = await pdfToImageDataURLs(
+            new Uint8Array(input.data.slice(0)).buffer,
+            DEFAULT_ADRAFT_IMAGE_MIMETYPE,
+            PDF_IMAGE_QUALITY,
+            PDF_IMAGE_PAGE_SCALE,
+            (progress) => {
+              edit(attachment.id, { outputsConversionProgress: progress / 2 }); // Update progress (0% to 50%)
+            },
+          );
           for (const pdfPageImage of imageDataURLs) {
-            const pdfPageImageF = await imageDataToImageAttachmentFragmentViaDBlob(pdfPageImage.mimeType, pdfPageImage.base64Data, source, `${title} (pg. ${newFragments.length + 1})`, caption, false, false);
-            if (pdfPageImageF)
-              imageFragments.push(pdfPageImageF);
+            const pdfPageImageF = await imageDataToImageAttachmentFragmentViaDBlob(
+              pdfPageImage.mimeType,
+              pdfPageImage.base64Data,
+              source,
+              `${title} (pg. ${newFragments.length + 1})`,
+              caption,
+              false,
+              false,
+            );
+            if (pdfPageImageF) imageFragments.push(pdfPageImageF);
           }
 
           // duplicated from 'pdf-text'
@@ -649,7 +761,15 @@ export async function attachmentPerformConversion(
           if (pdfText.trim().length < 2) {
             // Do not warn the user, as hopefully the images are useful
           } else {
-            const textFragment = createDocAttachmentFragment(title, caption, DVMimeType.TextPlain, createDMessageDataInlineText(pdfText, 'text/plain'), refString, DOCPART_DEFAULT_VERSION, { ...docMeta, srcOcrFrom: 'pdf' });
+            const textFragment = createDocAttachmentFragment(
+              title,
+              caption,
+              DVMimeType.TextPlain,
+              createDMessageDataInlineText(pdfText, 'text/plain'),
+              refString,
+              DOCPART_DEFAULT_VERSION,
+              { ...docMeta, srcOcrFrom: 'pdf' },
+            );
             newFragments.push(textFragment);
           }
 
@@ -660,7 +780,6 @@ export async function attachmentPerformConversion(
         }
         break;
 
-
       // docx to html
       case 'docx-to-html':
         if (!(input.data instanceof ArrayBuffer)) {
@@ -669,13 +788,49 @@ export async function attachmentPerformConversion(
         }
         try {
           const { convertDocxToHTML } = await import('./file-converters/DocxToMarkdown');
+          console.log('=====', input.data);
           const { html } = await convertDocxToHTML(input.data);
-          newFragments.push(createDocAttachmentFragment(title, caption, DVMimeType.VndAgiCode, createDMessageDataInlineText(html, 'text/html'), refString, DOCPART_DEFAULT_VERSION, docMeta));
+          console.log('=====', html);
+          newFragments.push(
+            createDocAttachmentFragment(
+              title,
+              caption,
+              DVMimeType.VndAgiCode,
+              createDMessageDataInlineText(html, 'text/html'),
+              refString,
+              DOCPART_DEFAULT_VERSION,
+              docMeta,
+            ),
+          );
         } catch (error) {
           console.error('Error in DOCX to Markdown conversion:', error);
         }
         break;
 
+      // xlsx to html
+      case 'xlsx-to-html':
+        if (!(input.data instanceof ArrayBuffer)) {
+          console.log('Expected ArrayBuffer for XLSX converter, got:', typeof input.data);
+          break;
+        }
+        try {
+          const { convertXlsxToHTML } = await import('./file-converters/XlsxToMarkdown');
+          const { html } = await convertXlsxToHTML(input.data);
+          newFragments.push(
+            createDocAttachmentFragment(
+              title,
+              caption,
+              DVMimeType.VndAgiCode,
+              createDMessageDataInlineText(html, 'text/html'),
+              refString,
+              DOCPART_DEFAULT_VERSION,
+              docMeta,
+            ),
+          );
+        } catch (error) {
+          console.error('Error in XLSX to Markdown conversion:', error);
+        }
+        break;
 
       // url page text
       case 'url-page-text':
@@ -725,14 +880,20 @@ export async function attachmentPerformConversion(
           const base64Data = imgDataUrl.slice(dataIndex + 1);
           // do not convert, as we're in the optimal webp already
           // do not resize, as the 512x512 is optimal for most LLM Vendors, an a great tradeoff of quality/size/cost
-          const screenshotImageF = await imageDataToImageAttachmentFragmentViaDBlob(mimeType, base64Data, source, `Screenshot of ${title}`, caption, false, false);
-          if (screenshotImageF)
-            newFragments.push(screenshotImageF);
+          const screenshotImageF = await imageDataToImageAttachmentFragmentViaDBlob(
+            mimeType,
+            base64Data,
+            source,
+            `Screenshot of ${title}`,
+            caption,
+            false,
+            false,
+          );
+          if (screenshotImageF) newFragments.push(screenshotImageF);
         } catch (error) {
           console.error('Error attaching screenshot URL image:', error);
         }
         break;
-
 
       // youtube transcript
       case 'youtube-transcript':
@@ -743,12 +904,14 @@ export async function attachmentPerformConversion(
         }
         const youtubeData = input.data as DraftYouTubeInputData;
         const transcriptText =
-          converter.id === 'youtube-transcript-simple' ? youtubeData.videoTranscript
+          converter.id === 'youtube-transcript-simple'
+            ? youtubeData.videoTranscript
             : `**YouTube Title**: ${youtubeData.videoTitle}\n\n**YouTube Description**: ${youtubeData.videoDescription}\n\n**YouTube Transcript**:\n${youtubeData.videoTranscript}\n`;
         const transcriptTextData = createDMessageDataInlineText(transcriptText, 'text/plain');
-        newFragments.push(createDocAttachmentFragment(title, caption, DVMimeType.TextPlain, transcriptTextData, refString, DOCPART_DEFAULT_VERSION, docMeta, undefined));
+        newFragments.push(
+          createDocAttachmentFragment(title, caption, DVMimeType.TextPlain, transcriptTextData, refString, DOCPART_DEFAULT_VERSION, docMeta, undefined),
+        );
         break;
-
 
       // ego: message
       case 'ego-fragments-inlined':
@@ -766,11 +929,12 @@ export async function attachmentPerformConversion(
             const fragmentTitle = `Chat Message: ${attachment.label}`;
             const fragmentCaption = 'From chat: ' + draftEgoData.conversationTitle;
             const fragmentRef = humanReadableHyphenated(refString + '-' + draftEgoData.messageId + '-' + fragment.fId);
-            newFragments.push(specialContentPartToDocAttachmentFragment(fragmentTitle, fragmentCaption, DVMimeType.TextPlain, fragment.part, fragmentRef, docMeta));
+            newFragments.push(
+              specialContentPartToDocAttachmentFragment(fragmentTitle, fragmentCaption, DVMimeType.TextPlain, fragment.part, fragmentRef, docMeta),
+            );
           }
         }
         break;
-
 
       case 'unhandled':
         // force the user to explicitly select 'as text' if they want to proceed
@@ -786,16 +950,12 @@ export async function attachmentPerformConversion(
   });
 }
 
-
 function _inputDataToString(data: AttachmentDraftInput['data']): string {
-  if (typeof data === 'string')
-    return data;
-  if (data instanceof ArrayBuffer)
-    return new TextDecoder('utf-8', { fatal: false }).decode(data);
+  if (typeof data === 'string') return data;
+  if (data instanceof ArrayBuffer) return new TextDecoder('utf-8', { fatal: false }).decode(data);
   console.log('attachment._inputDataToString: expected string or ArrayBuffer, got:', typeof data);
   return '';
 }
-
 
 /**
  * Special function to convert a list of files to Attachment Fragments, without passing through the attachments system
@@ -805,19 +965,24 @@ function _inputDataToString(data: AttachmentDraftInput['data']): string {
  *
  * Only returns the fragments that were successfully converted.
  */
-export async function convertFilesToDAttachmentFragments(origin: AttachmentDraftSourceOriginFile, files: FileWithHandle[], options: AttachmentCreationOptions): Promise<DMessageAttachmentFragment[]> {
+export async function convertFilesToDAttachmentFragments(
+  origin: AttachmentDraftSourceOriginFile,
+  files: FileWithHandle[],
+  options: AttachmentCreationOptions,
+): Promise<DMessageAttachmentFragment[]> {
   const validOutputFragmentsList: DMessageAttachmentFragment[][] = [];
 
   for (const fileWithHandle of files) {
-
     // This is the draft we'll edit and update
     const _draft = attachmentCreate({
-      media: 'file', origin, fileWithHandle, refPath: fileWithHandle.name,
+      media: 'file',
+      origin,
+      fileWithHandle,
+      refPath: fileWithHandle.name,
     });
 
     // Function to update the attachment draft
-    const updateDraft =
-      (changes: Partial<Omit<AttachmentDraft, 'outputFragments'>>) => Object.assign(_draft, changes);
+    const updateDraft = (changes: Partial<Omit<AttachmentDraft, 'outputFragments'>>) => Object.assign(_draft, changes);
 
     try {
       // 1. Load the input
@@ -835,17 +1000,17 @@ export async function convertFilesToDAttachmentFragments(origin: AttachmentDraft
       }
 
       // 3. Select the already (pre-selected) active, or the first (non-disabled) Converter
-      if (_draft.converters.findIndex(_c => _c.isActive) === -1) {
-        let activateIndex = _draft.converters.findIndex(_c => !_c.disabled);
-        if (activateIndex === -1)
-          activateIndex = 0;
+      if (_draft.converters.findIndex((_c) => _c.isActive) === -1) {
+        let activateIndex = _draft.converters.findIndex((_c) => !_c.disabled);
+        if (activateIndex === -1) activateIndex = 0;
         _draft.converters[activateIndex].isActive = true;
       }
 
       // 4. Perform conversion
-      await attachmentPerformConversion(_draft,
+      await attachmentPerformConversion(
+        _draft,
         (_, update) => updateDraft(update),
-        (_, fragments) => _draft.outputFragments = fragments,
+        (_, fragments) => (_draft.outputFragments = fragments),
       );
       if (!_draft.outputFragments.length) {
         console.warn(`[DEV] Failed to convert file: ${fileWithHandle.name}`, _draft);

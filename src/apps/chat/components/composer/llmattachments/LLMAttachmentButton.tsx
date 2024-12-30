@@ -29,7 +29,6 @@ import { ellipsizeFront, ellipsizeMiddle } from '~/common/util/textUtils';
 
 import type { LLMAttachmentDraft } from './useLLMAttachmentDrafts';
 
-
 const ATTACHMENT_MIN_STYLE = {
   height: '100%',
   minHeight: '40px',
@@ -47,38 +46,41 @@ const webPreviewImageSx = {
   // transformStyle: 'preserve-3d',
 } as const;
 
-
 const ellipsizeLabel = (label?: string) => {
-  if (!label)
-    return '';
-  return ellipsizeMiddle((label || '')
-    .replace(/https?:\/\/(?:www\.)?/, ''), 30)
+  if (!label) return '';
+  return ellipsizeMiddle((label || '').replace(/https?:\/\/(?:www\.)?/, ''), 30)
     .replace(/\/$/, '')
     .replace('…', '…\n…');
 };
-
 
 /**
  * Displayed while a source is loading
  */
 function InputLoadingPlaceholder(props: { label: string }) {
-  return <Sheet
-    color='success' variant='soft'
-    sx={{
-      border: '1px solid',
-      borderColor: 'success.solidBg',
-      borderRadius: 'sm',
-      display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 1,
-      ...ATTACHMENT_MIN_STYLE,
-      boxSizing: 'border-box',
-      px: 1, py: 0.5, // reduce
-    }}
-  >
-    <CircularProgress color='success' size='sm' />
-    <Typography level='title-sm' sx={{ whiteSpace: 'nowrap' }}>
-      {ellipsizeLabel(props.label)}
-    </Typography>
-  </Sheet>;
+  return (
+    <Sheet
+      color="success"
+      variant="soft"
+      sx={{
+        border: '1px solid',
+        borderColor: 'success.solidBg',
+        borderRadius: 'sm',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: 1,
+        ...ATTACHMENT_MIN_STYLE,
+        boxSizing: 'border-box',
+        px: 1,
+        py: 0.5, // reduce
+      }}
+    >
+      <CircularProgress color="success" size="sm" />
+      <Typography level="title-sm" sx={{ whiteSpace: 'nowrap' }}>
+        {ellipsizeLabel(props.label)}
+      </Typography>
+    </Sheet>
+  );
 }
 
 /**
@@ -88,9 +90,8 @@ function InputErrorIndicator() {
   return <WarningRoundedIcon sx={{ color: 'danger.solidBg' }} />;
 }
 
-
 const converterTypeToIconMap: { [key in AttachmentDraftConverterType]: React.ComponentType<any> | null } = {
-  'text': TextFieldsIcon,
+  text: TextFieldsIcon,
   'rich-text': CodeIcon,
   'rich-text-cleaner': CodeIcon,
   'rich-text-table': PivotTableChartIcon,
@@ -103,6 +104,7 @@ const converterTypeToIconMap: { [key in AttachmentDraftConverterType]: React.Com
   'pdf-images': PermMediaOutlinedIcon,
   'pdf-text-and-images': PermMediaOutlinedIcon,
   'docx-to-html': DescriptionOutlinedIcon,
+  'xlsx-to-html': DescriptionOutlinedIcon,
   'url-page-text': TextFieldsIcon, // was LanguageIcon
   'url-page-markdown': CodeIcon, // was LanguageIcon
   'url-page-html': HtmlIcon, // was LanguageIcon
@@ -111,13 +113,12 @@ const converterTypeToIconMap: { [key in AttachmentDraftConverterType]: React.Com
   'youtube-transcript': YouTubeIcon,
   'youtube-transcript-simple': YouTubeIcon,
   'ego-fragments-inlined': TelegramIcon,
-  'unhandled': TextureIcon,
+  unhandled: TextureIcon,
 };
 
 function attachmentIcons(attachmentDraft: AttachmentDraft, noTooltips: boolean, onViewImageRefPart: (imageRefPart: DMessageImageRefPart) => void) {
-  const activeConterters = attachmentDraft.converters.filter(c => c.isActive);
-  if (activeConterters.length === 0)
-    return null;
+  const activeConterters = attachmentDraft.converters.filter((c) => c.isActive);
+  if (activeConterters.length === 0) return null;
 
   // Alternate icon for the Web Page Screenshot
   const urlImage = attachmentDraft.input?.urlImage;
@@ -142,76 +143,89 @@ function attachmentIcons(attachmentDraft: AttachmentDraft, noTooltips: boolean, 
   const renderConverterIcons = !outputSingleImageRefDBlobs.length;
 
   // 1+ icons
-  return <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-
-    {/* If we have a Web preview, show it first */}
-    {!!urlImageData && /*!imageDataRefs.length &&*/ (
-      <TooltipOutlined key='preview' title={noTooltips ? null : <>
-        {urlImage?.generator === 'youtube-thumbnail' ? 'Thumbnail' : 'Page screenshot'} {!!urlImage?.timestamp && <>as of <TimeAgo date={urlImage.timestamp} /></>}.
-        <br />
-        Select <b>Add {urlImage?.generator === 'youtube-thumbnail' ? 'Thumbnail' : 'Screenshot'}</b> to attach it too.
-      </>} placement='top-start'>
-        <div>
-          <RenderImageURL
-            imageURL={urlImageData}
-            variant='attachment-button'
-            scaledImageSx={webPreviewImageSx}
-          />
-        </div>
-      </TooltipOutlined>
-    )}
-
-    {/* Render DBlob referred images in place of converter icons */}
-    {outputSingleImageRefDBlobs.map((dataRef, i) => dataRef && (
-      <TooltipOutlined key={`image-${dataRef.dblobAssetId}`} title={noTooltips ? null : <>View converted image{/* <br/>{dataRef?.bytesSize?.toLocaleString()} bytes */}</>} placement='top-start'>
-        <div>
-          <RenderImageRefDBlob
-            dataRefDBlobAssetId={dataRef.dblobAssetId}
-            dataRefMimeType={dataRef.mimeType}
-            variant='attachment-button'
-            scaledImageSx={attachmentIconSx}
-            onClick={handleViewFirstImage}
-          />
-        </div>
-      </TooltipOutlined>
-    ))}
-
-    {/*{activeConterters.some(c => c.id.startsWith('url-page-')) ? <LanguageIcon sx={{ opacity: 0.2, ml: -2.5 }} /> : null}*/}
-    {renderConverterIcons && activeConterters.map((_converter, idx) => {
-      const Icon = converterTypeToIconMap[_converter.id] ?? null;
-      return !Icon ? null : (
-        <TooltipOutlined key={`${_converter.id}-${idx}`} title={noTooltips ? null : `Attached as ${_converter.name}`} placement='top-start'>
-          <Icon sx={attachmentConverterSx} />
+  return (
+    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+      {/* If we have a Web preview, show it first */}
+      {!!urlImageData && (
+        /*!imageDataRefs.length &&*/ <TooltipOutlined
+          key="preview"
+          title={
+            noTooltips ? null : (
+              <>
+                {urlImage?.generator === 'youtube-thumbnail' ? 'Thumbnail' : 'Page screenshot'}{' '}
+                {!!urlImage?.timestamp && (
+                  <>
+                    as of <TimeAgo date={urlImage.timestamp} />
+                  </>
+                )}
+                .
+                <br />
+                Select <b>Add {urlImage?.generator === 'youtube-thumbnail' ? 'Thumbnail' : 'Screenshot'}</b> to attach it too.
+              </>
+            )
+          }
+          placement="top-start"
+        >
+          <div>
+            <RenderImageURL imageURL={urlImageData} variant="attachment-button" scaledImageSx={webPreviewImageSx} />
+          </div>
         </TooltipOutlined>
-      );
-    })}
+      )}
 
-  </Box>;
+      {/* Render DBlob referred images in place of converter icons */}
+      {outputSingleImageRefDBlobs.map(
+        (dataRef, i) =>
+          dataRef && (
+            <TooltipOutlined
+              key={`image-${dataRef.dblobAssetId}`}
+              title={noTooltips ? null : <>View converted image{/* <br/>{dataRef?.bytesSize?.toLocaleString()} bytes */}</>}
+              placement="top-start"
+            >
+              <div>
+                <RenderImageRefDBlob
+                  dataRefDBlobAssetId={dataRef.dblobAssetId}
+                  dataRefMimeType={dataRef.mimeType}
+                  variant="attachment-button"
+                  scaledImageSx={attachmentIconSx}
+                  onClick={handleViewFirstImage}
+                />
+              </div>
+            </TooltipOutlined>
+          ),
+      )}
+
+      {/*{activeConterters.some(c => c.id.startsWith('url-page-')) ? <LanguageIcon sx={{ opacity: 0.2, ml: -2.5 }} /> : null}*/}
+      {renderConverterIcons &&
+        activeConterters.map((_converter, idx) => {
+          const Icon = converterTypeToIconMap[_converter.id] ?? null;
+          return !Icon ? null : (
+            <TooltipOutlined key={`${_converter.id}-${idx}`} title={noTooltips ? null : `Attached as ${_converter.name}`} placement="top-start">
+              <Icon sx={attachmentConverterSx} />
+            </TooltipOutlined>
+          );
+        })}
+    </Box>
+  );
 }
 
 function attachmentLabelText(attachmentDraft: AttachmentDraft): string {
-  const converter = attachmentDraft.converters.find(c => c.isActive) ?? null;
+  const converter = attachmentDraft.converters.find((c) => c.isActive) ?? null;
   if (converter && attachmentDraft.label === 'Rich Text') {
-    if (converter.id === 'rich-text-table')
-      return 'Rich Table';
-    if (converter.id === 'rich-text-cleaner')
-      return 'Clean HTML';
-    if (converter.id === 'rich-text')
-      return 'Rich HTML';
+    if (converter.id === 'rich-text-table') return 'Rich Table';
+    if (converter.id === 'rich-text-cleaner') return 'Clean HTML';
+    if (converter.id === 'rich-text') return 'Rich HTML';
   }
   return ellipsizeFront(attachmentDraft.label, 22);
 }
 
-
 export const LLMAttachmentButtonMemo = React.memo(LLMAttachmentButton);
 
 function LLMAttachmentButton(props: {
-  llmAttachment: LLMAttachmentDraft,
-  menuShown: boolean,
-  onToggleMenu: (attachmentDraftId: AttachmentDraftId, anchor: HTMLAnchorElement) => void,
-  onViewImageRefPart: (imageRefPart: DMessageImageRefPart) => void,
+  llmAttachment: LLMAttachmentDraft;
+  menuShown: boolean;
+  onToggleMenu: (attachmentDraftId: AttachmentDraftId, anchor: HTMLAnchorElement) => void;
+  onViewImageRefPart: (imageRefPart: DMessageImageRefPart) => void;
 }) {
-
   // derived state
   const { attachmentDraft: draft, llmSupportsAllFragments } = props.llmAttachment;
 
@@ -220,38 +234,34 @@ function LLMAttachmentButton(props: {
   const isUnconvertible = !draft.converters.length;
   const isOutputLoading = draft.outputsConverting;
   const isOutputMissing = !draft.outputFragments.length;
-  const hasLiveFiles = draft.outputFragments.some(_f => _f.liveFileId);
+  const hasLiveFiles = draft.outputFragments.some((_f) => _f.liveFileId);
 
-  const showWarning = isUnconvertible || (isOutputMissing || !llmSupportsAllFragments);
-
+  const showWarning = isUnconvertible || isOutputMissing || !llmSupportsAllFragments;
 
   // handlers
 
   const { onToggleMenu } = props;
 
-  const handleToggleMenu = React.useCallback((event: React.MouseEvent<HTMLAnchorElement>) => {
-    event.preventDefault(); // added for the Right mouse click (to prevent the menu)
-    onToggleMenu(draft.id, event.currentTarget);
-  }, [draft.id, onToggleMenu]);
+  const handleToggleMenu = React.useCallback(
+    (event: React.MouseEvent<HTMLAnchorElement>) => {
+      event.preventDefault(); // added for the Right mouse click (to prevent the menu)
+      onToggleMenu(draft.id, event.currentTarget);
+    },
+    [draft.id, onToggleMenu],
+  );
 
   // choose variants and color
   const color: ColorPaletteProp =
-    (isInputLoading || isOutputLoading) ? 'success'
-      : isInputError ? 'danger'
-        : showWarning ? 'warning'
-          : /*props.menuShown ? 'primary' :*/ 'neutral';
+    isInputLoading || isOutputLoading ? 'success' : isInputError ? 'danger' : showWarning ? 'warning' : /*props.menuShown ? 'primary' :*/ 'neutral';
 
-  const variant: VariantProp =
-    (isInputLoading || isOutputLoading || isInputError || showWarning) ? 'soft'
-      : 'outlined';
+  const variant: VariantProp = isInputLoading || isOutputLoading || isInputError || showWarning ? 'soft' : 'outlined';
 
   // loading indicator before we are ready for a button
-  if (isInputLoading)
-    return <InputLoadingPlaceholder label={draft.label} />;
+  if (isInputLoading) return <InputLoadingPlaceholder label={draft.label} />;
 
   return (
     <Button
-      size='sm'
+      size="sm"
       color={color}
       variant={variant}
       onClick={handleToggleMenu}
@@ -262,31 +272,30 @@ function LLMAttachmentButton(props: {
         borderColor: variant === 'soft' ? `${color}.solidBg` : undefined,
         borderRadius: 'sm',
         ...ATTACHMENT_MIN_STYLE,
-        px: 1, py: 0.5, // reduce
+        px: 1,
+        py: 0.5, // reduce
         gap: 1,
       }}
     >
-
       {isInputError && <InputErrorIndicator />}
 
       {/* Icons: Web Page Screenshot, Converter[s] */}
       {attachmentIcons(draft, props.menuShown, props.onViewImageRefPart)}
 
       {/* Label */}
-      <Typography level='title-sm' sx={{ whiteSpace: 'nowrap' }}>
+      <Typography level="title-sm" sx={{ whiteSpace: 'nowrap' }}>
         {isOutputLoading ? 'Converting... ' : attachmentLabelText(draft)}
       </Typography>
 
       {/* Is Converting icon */}
-      {isOutputLoading && <CircularProgress color='success' size='sm' />}
+      {isOutputLoading && <CircularProgress color="success" size="sm" />}
 
       {/* LiveFile is supported icon */}
       {hasLiveFiles && (
-        <TooltipOutlined title='LiveFile is supported' placement='top-end'>
+        <TooltipOutlined title="LiveFile is supported" placement="top-end">
           <LiveFileIcon />
         </TooltipOutlined>
       )}
-
     </Button>
   );
 }

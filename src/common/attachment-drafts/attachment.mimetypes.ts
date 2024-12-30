@@ -1,14 +1,19 @@
 /// STAGE 1 - Mimetype Guessing
 
 type GuessedMimeType = keyof typeof GuessedMimeLookupTable;
-type GuessedMimeInfo = { ext: string[] | null, dt: GuessedMimeContents }
+type GuessedMimeInfo = { ext: string[] | null; dt: GuessedMimeContents };
 type GuessedMimeContents =
-  | 'plain'     // text/plain
-  | 'markdown'  //
-  | 'html'      //
-  | 'code'      //
-  | 'doc-pdf' | 'doc-msw' | 'doc-msxl' | 'doc-msppt'
-  | 'image' | 'audio' | 'video'
+  | 'plain' // text/plain
+  | 'markdown' //
+  | 'html' //
+  | 'code' //
+  | 'doc-pdf'
+  | 'doc-msw'
+  | 'doc-msxl'
+  | 'doc-msppt'
+  | 'image'
+  | 'audio'
+  | 'video'
   | 'other';
 
 const GuessedMimeLookupTable: Record<string, GuessedMimeInfo> = {
@@ -100,44 +105,43 @@ const GuessedMimeLookupTable: Record<string, GuessedMimeInfo> = {
 };
 
 const MdTitleToMimeLookupTable: Record<string, GuessedMimeType> = {
-  'typescript': 'text/x-typescript',
-  'ts': 'text/x-typescript',
-  'tsx': 'text/x-typescript',
-  'javascript': 'text/javascript',
-  'js': 'text/javascript',
-  'jsx': 'text/javascript',
-  'python': 'text/x-python',
-  'py': 'text/x-python',
-  'json': 'application/json',
-  'html': 'text/html',
-  'htm': 'text/html',
-  'css': 'text/css',
-  'md': 'text/markdown',
-  'markdown': 'text/markdown',
-  'sh': 'text/x-sh',
-  'bash': 'text/x-sh',
-  'shell': 'text/x-sh',
-  'csv': 'text/csv',
-  'tsv': 'text/csv',
-  'xml': 'text/xml',
-  'pdf': 'application/pdf',
-  'doc': 'application/msword',
-  'docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-  'xls': 'application/vnd.ms-excel',
-  'xlsx': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-  'ppt': 'application/vnd.ms-powerpoint',
-  'pptx': 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+  typescript: 'text/x-typescript',
+  ts: 'text/x-typescript',
+  tsx: 'text/x-typescript',
+  javascript: 'text/javascript',
+  js: 'text/javascript',
+  jsx: 'text/javascript',
+  python: 'text/x-python',
+  py: 'text/x-python',
+  json: 'application/json',
+  html: 'text/html',
+  htm: 'text/html',
+  css: 'text/css',
+  md: 'text/markdown',
+  markdown: 'text/markdown',
+  sh: 'text/x-sh',
+  bash: 'text/x-sh',
+  shell: 'text/x-sh',
+  csv: 'text/csv',
+  tsv: 'text/csv',
+  xml: 'text/xml',
+  pdf: 'application/pdf',
+  doc: 'application/msword',
+  docx: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  xls: 'application/vnd.ms-excel',
+  xlsx: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  ppt: 'application/vnd.ms-powerpoint',
+  pptx: 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
 };
 
 export function reverseLookupMimeType(fileExtension: string): GuessedMimeType | null {
   for (const [mimeType, { ext }] of Object.entries(GuessedMimeLookupTable)) {
-    if (ext && ext.includes(fileExtension))
-      return mimeType;
+    if (ext && ext.includes(fileExtension)) return mimeType;
   }
   return null;
 }
 
-export function reverseLookupMdTitle(mdTitle: string): { mimeType: GuessedMimeType, extension: string | null } | null {
+export function reverseLookupMdTitle(mdTitle: string): { mimeType: GuessedMimeType; extension: string | null } | null {
   const guessedMimeType = MdTitleToMimeLookupTable[mdTitle] || null;
   if (guessedMimeType) {
     const { ext } = GuessedMimeLookupTable[guessedMimeType];
@@ -151,14 +155,11 @@ export function guessInputContentTypeFromMime(mimeType: GuessedMimeType): Guesse
 }
 
 export function heuristicMimeTypeFixup(mimeType: GuessedMimeType, fileExtension?: string): GuessedMimeType {
-
   // Mpeg-transport video steam -> Typescript
-  if (!mimeType.startsWith('text/') && fileExtension && GuessedMimeLookupTable['text/x-typescript']?.ext?.includes(fileExtension))
-    return 'text/x-typescript';
+  if (!mimeType.startsWith('text/') && fileExtension && GuessedMimeLookupTable['text/x-typescript']?.ext?.includes(fileExtension)) return 'text/x-typescript';
 
   return mimeType;
 }
-
 
 /// STAGE 2 - Converter mimetypes, to decide which converter(s) to apply to an input
 
@@ -210,8 +211,7 @@ export function mimeTypeIsPlainText(mimeType: string): boolean {
 
 // Least common denominator of the instructions above - MimeTypes to treat as supported images for attachment purposes
 export function mimeTypeIsSupportedImage(mimeType: string): boolean {
-  if (GuessedMimeLookupTable[mimeType]?.dt !== 'image')
-    return false;
+  if (GuessedMimeLookupTable[mimeType]?.dt !== 'image') return false;
   // We actually narrow it down here to be a tad more restrictive
   return ['image/png', 'image/jpeg', 'image/webp', 'image/gif'].includes(mimeType);
 }
@@ -224,4 +224,9 @@ export function mimeTypeIsPDF(mimeType: string): boolean {
 // MimeTypes to treat as Word documents for attachment purposes
 export function mimeTypeIsDocX(mimeType: string): boolean {
   return GuessedMimeLookupTable[mimeType]?.dt === 'doc-msw';
+}
+
+// MimeTypes to treat as Excel documents for attachment purposes
+export function mimeTypeIsXlsX(mimeType: string): boolean {
+  return GuessedMimeLookupTable[mimeType]?.dt === 'doc-msxl';
 }

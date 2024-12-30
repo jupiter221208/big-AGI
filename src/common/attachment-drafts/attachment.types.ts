@@ -4,14 +4,13 @@ import type { DConversationId } from '~/common/stores/chat/chat.conversation';
 import type { DMessageAttachmentFragment, DMessageFragment } from '~/common/stores/chat/chat.fragments';
 import type { DMessageId } from '~/common/stores/chat/chat.message';
 
-
 // Attachment Draft
 
 export type AttachmentDraft = {
   readonly id: AttachmentDraftId;
-  readonly source: AttachmentDraftSource,
-  label: string;  // what's written in the button, such as a web page `title`
-  ref: string;    // will be used in ```ref\n...``` for instance the web page `url`
+  readonly source: AttachmentDraftSource;
+  label: string; // what's written in the button, such as a web page `title`
+  ref: string; // will be used in ```ref\n...``` for instance the web page `url`
 
   inputLoading: boolean;
   inputError: string | null;
@@ -33,30 +32,33 @@ export type AttachmentDraft = {
 
 export type AttachmentDraftId = string;
 
-
 // 0. draft source (filled at the onset)
 
-export type AttachmentDraftSource = {
-  media: 'url';
-  url: string; // parsed valid url
-  refUrl: string; // original text (use this as text ref, otherwise use the url)
-} | {
-  media: 'file';
-  origin: AttachmentDraftSourceOriginFile,
-  fileWithHandle: FileWithHandle;
-  refPath: string; // original file name, or path/to/file name
-} | {
-  media: 'text';
-  method: 'clipboard-read' | AttachmentDraftSourceOriginDTO;
-  textPlain?: string;
-  textHtml?: string;
-} | {
-  // special type for attachments thar are references to self (ego, application) objects
-  media: 'ego';
-  method: 'ego-fragments';
-  label: string;
-  egoFragmentsInputData: DraftEgoFragmentsInputData;
-};
+export type AttachmentDraftSource =
+  | {
+      media: 'url';
+      url: string; // parsed valid url
+      refUrl: string; // original text (use this as text ref, otherwise use the url)
+    }
+  | {
+      media: 'file';
+      origin: AttachmentDraftSourceOriginFile;
+      fileWithHandle: FileWithHandle;
+      refPath: string; // original file name, or path/to/file name
+    }
+  | {
+      media: 'text';
+      method: 'clipboard-read' | AttachmentDraftSourceOriginDTO;
+      textPlain?: string;
+      textHtml?: string;
+    }
+  | {
+      // special type for attachments thar are references to self (ego, application) objects
+      media: 'ego';
+      method: 'ego-fragments';
+      label: string;
+      egoFragmentsInputData: DraftEgoFragmentsInputData;
+    };
 
 export type AttachmentDraftSourceOriginFile = 'camera' | 'screencapture' | 'file-open' | 'clipboard-read' | AttachmentDraftSourceOriginDTO;
 
@@ -64,8 +66,7 @@ export type AttachmentDraftSourceOriginDTO = 'drop' | 'paste';
 
 export type AttachmentCreationOptions = {
   hintAddImages?: boolean;
-}
-
+};
 
 // 1. draft input (loaded from the source)
 
@@ -93,7 +94,7 @@ export type DraftWebInputData = {
   pageMarkdown?: string;
   pageCleanedHtml?: string;
   pageTitle?: string;
-}
+};
 
 export type DraftYouTubeInputData = {
   videoId: string;
@@ -101,15 +102,14 @@ export type DraftYouTubeInputData = {
   videoDescription: string;
   videoThumbnailUrl: string;
   videoTranscript: string;
-}
+};
 
 export type DraftEgoFragmentsInputData = {
   fragments: DMessageFragment[];
   conversationTitle: string;
   conversationId: DConversationId;
   messageId: DMessageId;
-}
-
+};
 
 // 2. draft converters (UI options to convert the input)
 
@@ -128,21 +128,34 @@ export type AttachmentDraftConverter = {
   // isAsync: boolean; // Whether the conversion is asynchronous
   // progress: number; // Conversion progress percentage (0..1)
   // errorMessage?: string; // Error message if the conversion failed
-}
+};
 
 export type AttachmentDraftConverterType =
-  | 'text' | 'rich-text' | 'rich-text-cleaner' | 'rich-text-table'
-  | 'image-original' | 'image-resized-high' | 'image-resized-low' | 'image-ocr' | 'image-to-default'
-  | 'pdf-text' | 'pdf-images' | 'pdf-text-and-images'
+  | 'text'
+  | 'rich-text'
+  | 'rich-text-cleaner'
+  | 'rich-text-table'
+  | 'image-original'
+  | 'image-resized-high'
+  | 'image-resized-low'
+  | 'image-ocr'
+  | 'image-to-default'
+  | 'pdf-text'
+  | 'pdf-images'
+  | 'pdf-text-and-images'
   | 'docx-to-html'
-  | 'url-page-text' | 'url-page-markdown' | 'url-page-html' | 'url-page-null' | 'url-page-image'
-  | 'youtube-transcript' | 'youtube-transcript-simple'
+  | 'xlsx-to-html'
+  | 'url-page-text'
+  | 'url-page-markdown'
+  | 'url-page-html'
+  | 'url-page-null'
+  | 'url-page-image'
+  | 'youtube-transcript'
+  | 'youtube-transcript-simple'
   | 'ego-fragments-inlined'
   | 'unhandled';
 
-
 // 3. Output - this is done via DMessageAttachmentFragment[], to be directly compatible with our data
-
 
 /*export type AttachmentDraftPreview = {
   renderer: 'noPreview',
